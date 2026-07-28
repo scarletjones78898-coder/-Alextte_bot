@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 # Bot token from environment variable
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+PORT = int(os.getenv('PORT', 8080))
+RAILWAY_PUBLIC_URL = os.getenv('RAILWAY_PUBLIC_URL', '')
 
 # Trading lessons data (simplified)
 LESSONS = {
@@ -242,6 +244,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'help':
         await show_help(query)
     
+    elif data == 'menu':
+        await start_menu(query)
+    
     elif data == 'next_lesson':
         # Get current lesson and move to next
         if user_id in user_progress:
@@ -415,6 +420,18 @@ Or type /start to begin! 🚀"""
         
         await update.message.reply_text(response, reply_markup=reply_markup)
 
+async def webhook_setup(application):
+    """Set up webhook for Railway deployment."""
+    if RAILWAY_PUBLIC_URL:
+        webhook_url = f"{RAILWAY_PUBLIC_URL}/webhook"
+        await application.bot.set_webhook(webhook_url)
+        logger.info(f"Webhook set to {webhook_url}")
+
+async def handle_webhook(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle incoming webhook updates."""
+    # This is automatically handled by the application
+    pass
+
 def main():
     """Start the bot."""
     # Create the Application
@@ -422,7 +439,7 @@ def main():
 
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", lambda update, context: show_help(update)))
+    application.add_handler(CommandHandler("help", start))
     
     # Add callback query handler
     application.add_handler(CallbackQueryHandler(button_callback))
@@ -430,9 +447,19 @@ def main():
     # Add message handler
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Start the Bot
-    print("Bot is starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Check if running on Railway (using webhook)
+    if RAILWAY_PUBLIC_URL:
+        # Set up webhook
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            url_path=TOKEN,
+            webhook_url=f"{RAILWAY_PUBLIC_URL}/{TOKEN}"
+        )
+    else:
+        # Local development - use polling
+        print("Bot is starting in polling mode...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main()
