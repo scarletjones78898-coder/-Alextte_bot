@@ -3,7 +3,6 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
-import json
 
 # Load environment variables
 load_dotenv()
@@ -17,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 # Bot token from environment variable
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-PORT = int(os.getenv('PORT', 8080))
-RAILWAY_PUBLIC_URL = os.getenv('RAILWAY_PUBLIC_URL', '')
 
 # Trading lessons data (simplified)
 LESSONS = {
@@ -312,7 +309,6 @@ async def show_help(query):
 📚 Commands:
 • /start - Welcome & Main Menu
 • /help - This help message
-• /lessons - View all lessons
 
 📖 How to use:
 1. Click "Start Learning" to begin
@@ -350,7 +346,6 @@ async def start_menu(query):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle user messages (for quiz answers)."""
-    user_id = update.effective_user.id
     message_text = update.message.text.lower()
     
     # Check for quiz answers
@@ -420,26 +415,42 @@ Or type /start to begin! 🚀"""
         
         await update.message.reply_text(response, reply_markup=reply_markup)
 
-async def webhook_setup(application):
-    """Set up webhook for Railway deployment."""
-    if RAILWAY_PUBLIC_URL:
-        webhook_url = f"{RAILWAY_PUBLIC_URL}/webhook"
-        await application.bot.set_webhook(webhook_url)
-        logger.info(f"Webhook set to {webhook_url}")
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /help command."""
+    help_text = """❓ Need Help?
 
-async def handle_webhook(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle incoming webhook updates."""
-    # This is automatically handled by the application
-    pass
+📚 Commands:
+• /start - Welcome & Main Menu
+• /help - This help message
+
+📖 How to use:
+1. Click "Start Learning" to begin
+2. Read each lesson carefully
+3. Click "Next Lesson" to continue
+
+Got questions? Just ask me!"""
+    
+    keyboard = [
+        [InlineKeyboardButton("🏠 Main Menu", callback_data='menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(help_text, reply_markup=reply_markup)
 
 def main():
     """Start the bot."""
+    print("Starting Forex Teaching Bot...")
+    
+    if not TOKEN:
+        print("ERROR: TELEGRAM_BOT_TOKEN not set!")
+        return
+    
     # Create the Application
     application = Application.builder().token(TOKEN).build()
 
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", start))
+    application.add_handler(CommandHandler("help", help_command))
     
     # Add callback query handler
     application.add_handler(CallbackQueryHandler(button_callback))
@@ -447,19 +458,9 @@ def main():
     # Add message handler
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Check if running on Railway (using webhook)
-    if RAILWAY_PUBLIC_URL:
-        # Set up webhook
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=TOKEN,
-            webhook_url=f"{RAILWAY_PUBLIC_URL}/{TOKEN}"
-        )
-    else:
-        # Local development - use polling
-        print("Bot is starting in polling mode...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Start the bot using polling (works on Railway)
+    print("Bot is running...")
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main()
