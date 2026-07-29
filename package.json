@@ -1,12 +1,1 @@
-{
-  "name": "forex-teaching-bot",
-  "version": "1.0.0",
-  "description": "Telegram Forex Trading Teaching Bot",
-  "main": "bot.py",
-  "scripts": {
-    "start": "python bot.py"
-  },
-  "engines": {
-    "python": "3.11"
-  }
-}
+{"ok": true, "result": true, "description": "Webhook was deleted"}
