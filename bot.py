@@ -14,10 +14,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Bot token from environment variable
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
-# Trading lessons data (simplified)
 LESSONS = {
     'intro': {
         'title': '📚 Introduction to Forex',
@@ -184,11 +182,10 @@ b) Invest all your savings
 c) Quit your job
 
 Reply with your answers (e.g., "1a, 2b, 3a, 4a")""",
-        'next': 'start'
+        'next': 'intro'
     }
 }
 
-# User data storage (simple)
 user_progress = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -196,7 +193,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     
-    # Initialize user progress
     user_progress[user_id] = {'current_lesson': 'intro'}
     
     welcome_text = f"""👋 Welcome {user.first_name} to Forex University!
@@ -231,6 +227,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
     
+    # Ensure user entry exists in memory to avoid KeyError
+    if user_id not in user_progress:
+        user_progress[user_id] = {'current_lesson': 'intro'}
+    
     if data.startswith('lesson_'):
         lesson_key = data.replace('lesson_', '')
         await send_lesson(query, lesson_key)
@@ -245,22 +245,22 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start_menu(query)
     
     elif data == 'next_lesson':
-        # Get current lesson and move to next
-        if user_id in user_progress:
-            current = user_progress[user_id].get('current_lesson', 'intro')
-            if current in LESSONS and LESSONS[current].get('next'):
-                next_lesson = LESSONS[current]['next']
-                await send_lesson(query, next_lesson)
+        current = user_progress[user_id].get('current_lesson', 'intro')
+        if current in LESSONS and LESSONS[current].get('next'):
+            next_lesson = LESSONS[current]['next']
+            await send_lesson(query, next_lesson)
 
 async def send_lesson(query, lesson_key):
     """Send a specific lesson."""
     user_id = query.from_user.id
     
+    if user_id not in user_progress:
+        user_progress[user_id] = {'current_lesson': 'intro'}
+        
     if lesson_key in LESSONS:
         lesson = LESSONS[lesson_key]
         user_progress[user_id]['current_lesson'] = lesson_key
         
-        # Create navigation buttons
         keyboard = [
             [InlineKeyboardButton("📖 Next Lesson", callback_data='next_lesson')],
             [InlineKeyboardButton("📚 Main Menu", callback_data='menu')]
@@ -276,14 +276,17 @@ async def send_lesson(query, lesson_key):
 async def show_progress(query):
     """Show user's progress."""
     user_id = query.from_user.id
-    current = user_progress.get(user_id, {}).get('current_lesson', 'intro')
+    if user_id not in user_progress:
+        user_progress[user_id] = {'current_lesson': 'intro'}
+        
+    current = user_progress[user_id].get('current_lesson', 'intro')
     
     lesson_keys = list(LESSONS.keys())
     current_index = lesson_keys.index(current) if current in lesson_keys else 0
     total = len(lesson_keys)
     
     progress_text = f"""📊 Your Progress:
-    
+
 Current Lesson: {LESSONS[current]['title']}
 Progress: {current_index + 1}/{total} lessons
 
@@ -348,13 +351,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle user messages (for quiz answers)."""
     message_text = update.message.text.lower()
     
-    # Check for quiz answers
     if '1' in message_text and '2' in message_text and '3' in message_text and '4' in message_text:
-        # Simple quiz checker
         answers = message_text.replace(' ', '').split(',')
         correct = 0
         
-        # Check answers (simplified)
         correct_answers = {
             '1a': True,
             '2b': True,
@@ -396,7 +396,6 @@ Don't worry, forex takes time to learn! 😊"""
         
         await update.message.reply_text(response)
     else:
-        # General response
         response = """I'm here to teach you forex! 📚
 
 Use the buttons below to navigate:
@@ -445,20 +444,13 @@ def main():
         print("ERROR: TELEGRAM_BOT_TOKEN not set!")
         return
     
-    # Create the Application
     application = Application.builder().token(TOKEN).build()
 
-    # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    
-    # Add callback query handler
     application.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Add message handler
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Start the bot using polling (works on Railway)
     print("Bot is running...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
